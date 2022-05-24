@@ -30,7 +30,7 @@ GZIP_SUPPORT = 1
 # To build install the library and uncomment
 # the XZ_SUPPORT line below.
 #
-#XZ_SUPPORT = 1
+XZ_SUPPORT = 1
 
 
 ############ Building LZO support ##############
@@ -171,6 +171,9 @@ UNSQUASHFS_OBJS = unsquashfs.o unsquash-1.o unsquash-2.o unsquash-3.o \
 	unsquash-4.o unsquash-123.o unsquash-34.o unsquash-1234.o unsquash-12.o \
 	swap.o compressor.o unsquashfs_info.o
 
+LSSQUASHFS_OBJS = lssquashfs.o unsquash-1.o unsquash-2.o unsquash-3.o \
+	unsquash-4.o swap.o compressor.o
+
 CFLAGS ?= -O2
 CFLAGS += $(EXTRA_CFLAGS) $(INCLUDEDIR) -D_FILE_OFFSET_BITS=64 \
 	-D_LARGEFILE_SOURCE -D_GNU_SOURCE -DCOMP_DEFAULT=\"$(COMP_DEFAULT)\" \
@@ -181,6 +184,7 @@ ifeq ($(GZIP_SUPPORT),1)
 CFLAGS += -DGZIP_SUPPORT
 MKSQUASHFS_OBJS += gzip_wrapper.o
 UNSQUASHFS_OBJS += gzip_wrapper.o
+LSSQUASHFS_OBJS += gzip_wrapper.o
 LIBS += -lz
 COMPRESSORS += gzip
 endif
@@ -192,6 +196,7 @@ INCLUDEDIR += -I$(LZMA_DIR)/C
 CFLAGS += -DLZMA_SUPPORT
 MKSQUASHFS_OBJS += lzma_wrapper.o $(LZMA_OBJS)
 UNSQUASHFS_OBJS += lzma_wrapper.o $(LZMA_OBJS)
+LSSQUASHFS_OBJS ++ lzma_wrapper.o $(LZMA_OBJS)
 COMPRESSORS += lzma
 endif
 
@@ -199,6 +204,7 @@ ifeq ($(LZMA_XZ_SUPPORT),1)
 CFLAGS += -DLZMA_SUPPORT
 MKSQUASHFS_OBJS += lzma_xz_wrapper.o
 UNSQUASHFS_OBJS += lzma_xz_wrapper.o
+LSSQUASHFS_OBJS ++ lzma_xz_wrapper.o
 LIBS += -llzma
 COMPRESSORS += lzma
 endif
@@ -207,6 +213,7 @@ ifeq ($(XZ_SUPPORT),1)
 CFLAGS += -DXZ_SUPPORT
 MKSQUASHFS_OBJS += xz_wrapper.o
 UNSQUASHFS_OBJS += xz_wrapper.o
+LSSQUASHFS_OBJS += xz_wrapper.o
 LIBS += -llzma
 COMPRESSORS += xz
 endif
@@ -215,6 +222,7 @@ ifeq ($(LZO_SUPPORT),1)
 CFLAGS += -DLZO_SUPPORT
 MKSQUASHFS_OBJS += lzo_wrapper.o
 UNSQUASHFS_OBJS += lzo_wrapper.o
+LSSQUASHFS_OBJS += lzo_wrapper.o
 LIBS += -llzo2
 COMPRESSORS += lzo
 endif
@@ -223,6 +231,7 @@ ifeq ($(LZ4_SUPPORT),1)
 CFLAGS += -DLZ4_SUPPORT
 MKSQUASHFS_OBJS += lz4_wrapper.o
 UNSQUASHFS_OBJS += lz4_wrapper.o
+LSSQUASHFS_OBJS += lz4_wrapper.o
 LIBS += -llz4
 COMPRESSORS += lz4
 endif
@@ -231,6 +240,7 @@ ifeq ($(ZSTD_SUPPORT),1)
 CFLAGS += -DZSTD_SUPPORT
 MKSQUASHFS_OBJS += zstd_wrapper.o
 UNSQUASHFS_OBJS += zstd_wrapper.o
+LSSQUASHFS_OBJS += zstd_wrapper.o
 LIBS += -lzstd
 COMPRESSORS += zstd
 endif
@@ -243,6 +253,7 @@ CFLAGS += -DXATTR_SUPPORT
 endif
 MKSQUASHFS_OBJS += xattr.o read_xattrs.o tar_xattr.o
 UNSQUASHFS_OBJS += read_xattrs.o unsquashfs_xattr.o
+LSSQUASHFS_OBJS += read_xattrs.o
 endif
 
 ifeq ($(REPRODUCIBLE_DEFAULT),1)
@@ -328,7 +339,7 @@ mksquashfs: $(MKSQUASHFS_OBJS)
 
 mksquashfs.o: Makefile mksquashfs.c squashfs_fs.h squashfs_swap.h mksquashfs.h \
 	sort.h pseudo.h compressor.h xattr.h action.h mksquashfs_error.h progressbar.h \
-	info.h caches-queues-lists.h read_fs.h restore.h process_fragments.h 
+	info.h caches-queues-lists.h read_fs.h restore.h process_fragments.h
 
 reader.o: squashfs_fs.h mksquashfs.h caches-queues-lists.h progressbar.h \
 	mksquashfs_error.h pseudo.h sort.h
@@ -407,15 +418,22 @@ unsquashfs_xattr.o: unsquashfs_xattr.c unsquashfs.h squashfs_fs.h xattr.h unsqua
 
 unsquashfs_info.o: unsquashfs.h squashfs_fs.h unsquashfs_error.h
 
+lssquashfs: $(LSSQUASHFS_OBJS)
+	$(CC) $(LDFLAGS) $(EXTRA_LDFLAGS) $(LSSQUASHFS_OBJS) $(LIBS) -o $@
+
+lssquashfs.o: unsquashfs.h lssquashfs.c squashfs_fs.h squashfs_swap.h \
+	squashfs_compat.h xattr.h read_fs.h compressor.h
+
 .PHONY: clean
 clean:
-	-rm -f *.o mksquashfs unsquashfs sqfstar sqfscat *.1
+	-rm -f *.o mksquashfs unsquashfs lssquasfs sqfstar sqfscat *.1
 
 .PHONY: install
 install: mksquashfs unsquashfs
 	mkdir -p $(INSTALL_DIR)
 	cp mksquashfs $(INSTALL_DIR)
 	cp unsquashfs $(INSTALL_DIR)
+	cp lssquashfs $(INSTALL_DIR)
 	ln -fs unsquashfs $(INSTALL_DIR)/sqfscat
 	ln -fs mksquashfs $(INSTALL_DIR)/sqfstar
 	../generate-manpages/install-manpages.sh $(shell pwd)/.. "$(INSTALL_MANPAGES_DIR)"
